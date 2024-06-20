@@ -1,28 +1,23 @@
 package com.example.listadenomes;
 
-import android.os.Bundle;
-
-import androidx.activity.EdgeToEdge;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
-
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
-import android.view.View;
-import android.text.TextWatcher;
 import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
@@ -30,12 +25,14 @@ public class MainActivity extends AppCompatActivity {
     private EditText editTextNome;
     private Button buttonAdicionar;
     private ListView listViewNomes;
+    private EditText editTextBusca;
 
     private DbHelper dbHelper;
     private SQLiteDatabase db;
     private ArrayAdapter<String> adapter;
     private ArrayList<String> listaNomes;
     private ArrayList<Integer> listaIds;
+    private String userRole;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
         editTextNome = findViewById(R.id.editTextNome);
         buttonAdicionar = findViewById(R.id.buttonAdicionar);
         listViewNomes = findViewById(R.id.listViewNomes);
+        editTextBusca = findViewById(R.id.editTextBusca);
 
         dbHelper = new DbHelper(this);
         db = dbHelper.getWritableDatabase();
@@ -53,6 +51,18 @@ public class MainActivity extends AppCompatActivity {
         listaIds = new ArrayList<>();
         adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, listaNomes);
         listViewNomes.setAdapter(adapter);
+
+        SharedPreferences sharedPref = getSharedPreferences("user_data", MODE_PRIVATE);
+        userRole = sharedPref.getString("role", "User");
+
+        // Controlar a visibilidade dos elementos da interface do usuário com base na função do usuário
+        if (userRole.equals("Admin")) {
+            editTextNome.setVisibility(View.VISIBLE);
+            buttonAdicionar.setVisibility(View.VISIBLE);
+        } else {
+            editTextNome.setVisibility(View.GONE);
+            buttonAdicionar.setVisibility(View.GONE);
+        }
 
         carregarNomes();
 
@@ -75,40 +85,36 @@ public class MainActivity extends AppCompatActivity {
                 final int itemId = listaIds.get(position);
                 final String nomeAtual = listaNomes.get(position);
 
-                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-                builder.setTitle("Ações");
-                builder.setItems(new CharSequence[]{"Editar", "Excluir"}, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialogInterface, int which) {
-                        if (which == 0) {
-                            // Editar
-                            mostrarDialogEditar(itemId, nomeAtual);
-                        } else {
-                            // Excluir
-                            excluirNome(itemId);
+                if (userRole.equals("Admin")) {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                    builder.setTitle("Ações");
+                    builder.setItems(new CharSequence[]{"Editar", "Excluir"}, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int which) {
+                            if (which == 0) {
+                                mostrarDialogEditar(itemId, nomeAtual);
+                            } else {
+                                excluirNome(itemId);
+                            }
                         }
-                    }
-                });
-                builder.show();
+                    });
+                    builder.show();
+                }
             }
         });
 
-        EditText editTextBusca = findViewById(R.id.editTextBusca);
         editTextBusca.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                // Não precisa implementar nada aqui
             }
 
             @Override
             public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                // Filtra a lista quando o texto mudar
-                MainActivity.this.adapter.getFilter().filter(charSequence);
+                adapter.getFilter().filter(charSequence);
             }
 
             @Override
             public void afterTextChanged(Editable editable) {
-                // Não precisa implementar nada aqui
             }
         });
     }
@@ -134,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void adicionarNome(String nome) {
-        db.execSQL("INSERT INTO " + DbHelper.TABLE_NAME + " (" + DbHelper.COLUMN_NOME + ") VALUES ('" + nome + "')");
+        dbHelper.adicionarNome(db, nome, userRole);
         carregarNomes();
     }
 
